@@ -52,6 +52,7 @@ const ignoredWords = new Set([
 function getSearchTerms(question) {
   return question
     .toLowerCase()
+    .replace(/\bonline\s+class(?:es)?\b/g, 'webcam headset')
     .replace(/(?:₱|php\s*)?\d[\d,]*(?:\.\d+)?/gi, ' ')
     .split(/[^a-z0-9]+/)
     .filter((term) => term.length > 2)

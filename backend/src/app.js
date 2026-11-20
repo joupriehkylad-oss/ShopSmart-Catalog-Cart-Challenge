@@ -13,6 +13,11 @@ import authRouter from './routes/auth.js';
 export function createApp() {
   const app = express();
 
+  // Trust the local Nginx reverse proxy in production
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 'loopback');
+  }
+
   // Security middleware
   app.disable('x-powered-by');
   app.use(helmet());
@@ -22,10 +27,6 @@ export function createApp() {
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
   }));
-
-  // Request body and cookie parsing
-  app.use(express.json({ limit: '100kb' }));
-  app.use(cookieParser());
 
   // Request tracking
   app.use((request, response, next) => {
@@ -42,6 +43,10 @@ export function createApp() {
   // Request logging
   app.use(morgan(':method :url :status :response-time ms'));
 
+  // Request body and cookie parsing
+  app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
+
   // Health check
   app.get('/api/health', (_request, response) => {
     response.json({
@@ -52,7 +57,7 @@ export function createApp() {
   // Authentication routes
   app.use('/api/auth', authRouter);
 
-  // Existing ShopSmart routes
+  // ShopSmart API routes
   app.use('/api/products', productsRouter);
   app.use('/api/orders', ordersRouter);
   app.use('/api/assistant', assistantRouter);
