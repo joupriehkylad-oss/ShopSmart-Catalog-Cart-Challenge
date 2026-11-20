@@ -1,16 +1,21 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import StatusMessage from '../components/StatusMessage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { api } from '../services/api.js';
 
-export default function CheckoutPage() {
+function formatPrice(value) {
+  return Number(value).toLocaleString('en-PH', {
+    style: 'currency',
+    currency: 'PHP'
+  });
+}
+
+export default function CheckoutPage({ user }) {
   const { cart, total, clearCart } = useCart();
 
   const [form, setForm] = useState({
-    customerName: '',
-    email: '',
+    customerName: user?.name || '',
     address: ''
   });
 
@@ -27,12 +32,20 @@ export default function CheckoutPage() {
 
   async function submitOrder(event) {
     event.preventDefault();
+
+    if (submitting || !user || cart.length === 0) {
+      return;
+    }
+
     setError('');
     setSubmitting(true);
 
     try {
       const created = await api.createOrder({
-        ...form,
+        customerName: form.customerName.trim(),
+        email: user.email,
+        address: form.address.trim(),
+
         items: cart.map((item) => ({
           productId: item.productId,
           quantity: item.quantity
@@ -41,153 +54,209 @@ export default function CheckoutPage() {
 
       setOrder(created);
       clearCart();
+
     } catch (caught) {
-      setError(caught.message);
+      setError(
+        caught.message || 'Unable to place your order.'
+      );
+
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Display the receipt after a successful order.
+  // Successful order receipt
+
   if (order) {
     return (
       <section className="success-card">
-        <p className="eyebrow">ORDER RECEIVED</p>
+
+        <p className="eyebrow">
+          ORDER RECEIVED
+        </p>
 
         <h1>Thank you, {order.customerName}!</h1>
 
         <p>
-          Your simulated order number is{' '}
-          <strong>#{order.id}</strong>.
+          Your simulated order has been placed successfully.
         </p>
 
         <p>
-          Total:{' '}
-          <strong>
-            ₱{Number(order.total).toLocaleString('en-PH', {
-              minimumFractionDigits: 2
-            })}
-          </strong>
+          <strong>Order number:</strong> #{order.id}
         </p>
 
-        <Link className="button" to="/">
-          Continue shopping
-        </Link>
+        <p>
+          <strong>Status:</strong> {order.status}
+        </p>
+
+        <p>
+          <strong>Total:</strong> {formatPrice(order.total)}
+        </p>
+
+        <p>
+          Your order has been saved to your ShopSmart account.
+        </p>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <Link className="button" to="/orders">
+            View My Orders
+          </Link>
+
+          <Link className="button" to="/">
+            Continue shopping
+          </Link>
+        </div>
+
+        <p>
+          <small>No actual payment was collected.</small>
+        </p>
+
       </section>
     );
   }
 
-  // Show a message when the cart is empty.
+  // Empty cart
+
   if (cart.length === 0) {
     return (
-      <section>
-        <div className="empty-state">
-          <h1>Your cart is empty</h1>
+      <section className="empty-state">
 
-          <Link className="button" to="/">
-            Browse products
-          </Link>
-        </div>
+        <h1>Your cart is empty</h1>
+
+        <Link className="button" to="/">
+          Browse products
+        </Link>
+
       </section>
     );
   }
 
   return (
     <section className="checkout-layout">
+
       <form onSubmit={submitOrder}>
-        <p className="eyebrow">SIMULATED CHECKOUT</p>
+
+        <p className="eyebrow">
+          SIMULATED CHECKOUT
+        </p>
 
         <h1>Delivery information</h1>
 
-        <StatusMessage type="error">{error}</StatusMessage>
+        <p>
+          Signed in as {user?.name}
+        </p>
+
+        {error && (
+          <StatusMessage type="error">
+            {error}
+          </StatusMessage>
+        )}
 
         <label>
           Full name
+
           <input
             name="customerName"
             value={form.customerName}
             onChange={updateField}
-            minLength="2"
-            maxLength="80"
+            minLength={2}
+            maxLength={80}
+            disabled={submitting}
             required
           />
         </label>
 
         <label>
           Email address
+
           <input
-            name="email"
             type="email"
-            value={form.email}
-            onChange={updateField}
-            required
+            value={user?.email || ''}
+            readOnly
           />
         </label>
 
+        <small>
+          Your order will be linked to this account.
+        </small>
+
         <label>
           Delivery address
+
           <textarea
             name="address"
             value={form.address}
             onChange={updateField}
-            minLength="10"
-            maxLength="300"
+            minLength={10}
+            maxLength={300}
+            placeholder="Enter a fictional delivery address"
+            disabled={submitting}
             required
           />
         </label>
 
-        <button type="submit" disabled={submitting}>
+        <button
+          type="submit"
+          disabled={submitting}
+        >
           {submitting
-            ? 'Submitting order…'
+            ? 'Submitting order...'
             : 'Place simulated order'}
         </button>
+
       </form>
 
       <aside className="summary">
+
         <h2>Checkout Review</h2>
 
-        <p>Review your items before placing your order.</p>
+        <p>
+          Review your items before placing your order.
+        </p>
 
-        {/* Show each item from the existing cart state. */}
-        <div className="checkout-items">
-          {cart.map((item) => (
-            <div
-              key={item.productId}
-              className="checkout-item"
-              style={{
-                padding: '12px 0',
-                borderBottom: '1px solid #ddd'
-              }}
-            >
-              <strong>{item.name}</strong>
+        {cart.map((item) => (
+          <div
+            key={item.productId}
+            style={{
+              padding: '12px 0',
+              borderBottom: '1px solid #ddd'
+            }}
+          >
+            <strong>{item.name}</strong>
 
-              <p>
-                Quantity: {item.quantity}
-              </p>
+            <p>
+              Quantity: {item.quantity}
+            </p>
 
-              <p>
-                ₱{Number(item.price).toLocaleString('en-PH')}
-                {' × '}
-                {item.quantity}
-              </p>
+            <p>
+              {formatPrice(item.price)} × {item.quantity}
+            </p>
 
-              <p>
-                Subtotal:{' '}
-                <strong>
-                  ₱{(
-                    Number(item.price) * item.quantity
-                  ).toLocaleString('en-PH')}
-                </strong>
-              </p>
-            </div>
-          ))}
-        </div>
+            <p>
+              Subtotal:{' '}
+
+              <strong>
+                {formatPrice(item.price * item.quantity)}
+              </strong>
+            </p>
+
+          </div>
+        ))}
 
         <p className="summary-total">
+
           <span>Total</span>
+
           <strong>
-            ₱{total.toLocaleString('en-PH')}
+            {formatPrice(total)}
           </strong>
+
         </p>
 
         <Link to="/cart">
@@ -195,9 +264,14 @@ export default function CheckoutPage() {
         </Link>
 
         <p>
-          <small>No actual payment will be collected.</small>
+          <small>
+            Classroom demonstration only.
+            No actual payment will be collected.
+          </small>
         </p>
+
       </aside>
+
     </section>
   );
 }
